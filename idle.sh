@@ -80,7 +80,7 @@ function idle-fetch-containers() {
         sec=$((sec + 1));
       done 
       /usr/bin/lxc file push ${HOME}/idle/$startupScript ${containerName}/root/${startupScript}
-      /usr/bin/lxc exec $containerName $conatinerShell /root/${startupScript}
+      /usr/bin/lxc exec $containerName $containerShell /root/${startupScript}
       echo "Container is ready for work.";
     else
       echo "Given container name doesn't exist in project database";
