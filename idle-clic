@@ -1,0 +1,48 @@
+#!/bin/bash
+  
+function help() {
+  echo 'idle-cli - Inter-Distribution Linux Environment CLI';
+  echo '@ 2023 morketsmerke.org';
+  echo;
+  echo "Options:";
+  echo "  list-distros - listing available containers with Linux distros on this server";
+  echo "  shell <distro_name> - bring up the shell of given distro";
+  echo "  check-commmand <distro_name> <command> - verify is given command exists in given distro";
+  echo "  apropos <distro_name> <keywords> - finds commmands match to given keywords";
+  echo "  pkgsearch <distro_name> <package> - check is given package is ready to install in given distro";
+  echo;
+  echo "<distro_name> - pointing only one distro, but you can use also:"
+  echo "  <group>:";
+  echo "    --deb - .deb packages using distros (debian,kali,ubuntu)";
+  echo "    --rpm - .rpm packages using distros (fedora,rocky,opensuse)";
+  echo "    --other - other distros don't match to above (alpine,archlinux,gentoo,void)";
+  echo "  or <--all> - all 10 available distros (warning, output could be large, use some of pager)";
+  echo;
+  echo 'Usage:';
+  echo '  $ idle-clic list-distros';
+  echo '  $ idle-clic shell rocky';
+  echo '  $ idle-clic check-command netstat';
+  echo '  $ idle-clic apropos zip';
+  echo '  $ idle-clic pkgsearch "intel sound"';
+  echo;
+  echo 'IDLE Configuration:';
+  echo 'In ~/.idle/.idle.conf file (example of this file: /usr/share/idle/idle.conf)';
+  echo '  RUSER="user";';
+  echo '  IDLESERVER="idle.example.org";';
+  echo '  SSH_OPTS="-p 10022 -i ~/id_rsa"; #OPTIONAL';
+}
+
+if [ -f ~/.idle/idle.conf ]; then
+  source ~/.idle/idle.conf;
+  echo "IDLE Server response:";
+  if echo $@ | grep -q 'shell'; then
+    ssh -t ${SSH_OPTS} ${RUSER}@${IDLESERVER} "idle-clis $@";
+  else
+    ssh ${SSH_OPTS} ${RUSER}@${IDLESERVER} "idle-clis $@";
+  fi
+  if [ $? -eq 1 ]; then help; exit 1; fi
+else
+  echo "There is no IDLE config file. Exiting...";
+  help;
+  exit 1;
+fi

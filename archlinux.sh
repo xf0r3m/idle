@@ -7,4 +7,5 @@ echo "root ALL=(ALL:ALL) NOPASSWD:ALL" >> /etc/sudoers;
 pacman -Syu --noconfirm;
 pacman -Sy --noconfirm neofetch;
 
-echo "/usr/bin/neofetch" >> /home/archuser/.bashrc;
+pacman -Sy --noconfirm man-db man-pages;
+mandb -c

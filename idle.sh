@@ -39,18 +39,36 @@ function idle-lxd-init() {
   cat $HOME/idle/idle_preseed.yaml | sudo lxd init --preseed;
 }
 
+
+function idle-get-container-name-list() {
+  rpmGrepOpts='-E rocky.sh|fedora.sh|opensuse.sh';
+  debGrepOpts='deb.sh';
+  otherGrepOpts='-v -E rocky.sh|fedora.sh|opensuse.sh|deb.sh';
+  if [ "$1" = "--deb" ]; then
+    echo $(grep $debGrepOpts $DATABASE | cut -d ";" -f 3 | awk '{printf $1" "}');
+  elif [ "$1" = "--rpm" ]; then
+    echo $(grep $rpmGrepOpts $DATABASE | cut -d ";" -f 3 | awk '{printf $1" "}');
+  elif [ "$1" = "--other" ]; then
+    echo $(grep $otherGrepOpts $DATABASE | cut -d ";" -f 3 | awk '{printf $1" "}');
+  elif [ "$1" = "--all" ]; then
+    echo $(cut -d ";" -f 3 $DATABASE | awk '{printf $1" "}');
+  elif echo $1 | grep -q '\,'; then
+    echo $(echo $1 | sed 's/,/ /g');
+  fi
+}
+
 function idle-list-containers() {
   if ! lxc profile show default | grep -q 'idle'; then
     echo -e "${RED}LXD isn't initialized. You must run 'idle-lxd-init' firs${ENDCOLOR}";
-    exit 1;
   else
-    for container in $(cut -d ";" -f 3 $DATABASE | awk '{printf $1" "}'); do
+    containerNameList=$(idle-get-container-name-list --all);
+    for container in $containerNameList; do
       if lxc info $container >> /dev/null 2>&1; then
         installed="\e[32m\u2714\e[0m";
       else
         installed="\e[31m\u2716\e[0m";
       fi
-      desc=$(grep "$container" $DATABASE | cut -d ";" -f 5);
+      desc=$(grep "$container" $DATABASE | cut -d ";" -f 6);
       echo -e "${container}: $desc $installed"; 
     done
   fi
@@ -58,9 +76,9 @@ function idle-list-containers() {
 
 function idle-fetch-containers() {
 
-  rpmGrepOpts='-E rpm.sh|fedora.sh|opensuse.sh|alt.sh';
+  rpmGrepOpts='-E rocky.sh|fedora.sh|opensuse.sh';
   debGrepOpts='deb.sh';
-  otherGrepOpts='-v -E rpm.sh|fedora.sh|opensuse.sh|alt.sh|deb.sh';
+  otherGrepOpts='-v -E rocky.sh|fedora.sh|opensuse.sh|deb.sh';
 
   function create-container() {
     containerName=$1;
@@ -88,60 +106,79 @@ function idle-fetch-containers() {
   }
   
   function list-containers() {
-    containerNameList=$(grep $@ $DATABASE | cut -d ";" -f 3 | awk '{printf $1" "}');
+    containerNameList=$(idle-get-container-name-list $1);
     for contName in $containerNameList; do
       echo -e "    $contName";
     done
   }
 
+
+
   function mass-create-container() {
-    if echo $1 | grep -q '\,'; then
-      containerNameList=$(echo $1 | sed 's/,/ /g');
-    else
-      containerNameList=$(grep $@ $DATABASE | cut -d ";" -f 3 | awk '{printf $1" "}');
-    fi
+    containerNameList=$(idle-get-container-name-list $1);
     for contName in $containerNameList; do
       create-container $contName;
     done 
   }
 
-  if [ "$1" ]; then
-    if [ "$1" = "--all" ]; then
-      containerNameList=$(cut -d ";" -f 3 $DATABASE | awk '{printf $1" "}');
-      for contName in $containerNameList; do
-       create-container $contName; 
-      done
-    elif [ "$1" = "--deb" ]; then
-      mass-create-container $debGrepOpts;
-    elif [ "$1" = "--rpm" ]; then
-      mass-create-container $rpmGrepOpts;
-    elif [ "$1" = "--other" ]; then
-      mass-create-container $otherGrepOpts;
-    elif echo $1 | grep -q '\,'; then
-      mass-create-container $1;
-    else
-      contName=$1;
-      create-container $contName;
-    fi 
+  function update-database() {
+    source /usr/local/bin/database;
+    idle-db-update-containers-desc;
+  }
+
+  if ! lxc profile show default | grep -q 'idle'; then
+    echo -e "${RED}LXD isn't initialized. You must run 'idle-lxd-init' firs${ENDCOLOR}";
+    exit 1;
   else
-    echo "idle-fetch-containers - fetch IDLE containers";
-    echo "IDLE Project @ 2023 morketsmerke.org";
-    echo;
-    echo "Usage: ";
-    echo "$ idle-fetch-containers <--all/container_name/group_containers>";
-    echo;
-    echo "Containers name:";
-    for contName in $(cut -d ";" -f 3 $DATABASE | awk '{printf $1" "}'); do
-      echo -e "  ${contName}";
-    done
-    echo;
-    echo "Groups:";
-    echo -e "  --deb - based on APT package manager";
-    list-containers $debGrepOpts;
-    echo -e "  --rpm - based on RPM package manager";
-    list-containers $rpmGrepOpts;
-    echo -e "  --other - other containers not fit to above groups:";
-    list-containers $otherGrepOpts;
-    return 1;
+    if [ "$1" ]; then
+      if echo $1 | grep -q '\-\-'; then
+        mass-create-container $1;
+      else
+        contName=$1;
+        create-container $contName;
+      fi
+      echo "Updating database...";
+      update-database;
+    else
+      echo "idle-fetch-containers - fetch IDLE containers";
+      echo "IDLE Project @ 2023 morketsmerke.org";
+      echo;
+      echo "Usage: ";
+      echo "$ idle-fetch-containers <--all/container_name/group_containers>";
+      echo;
+      echo "Containers name:";
+      for contName in $(cut -d ";" -f 3 $DATABASE | awk '{printf $1" "}'); do
+        echo -e "  ${contName}";
+      done
+      echo;
+      echo "Groups:";
+      echo -e "  --deb - based on APT package manager";
+      list-containers $debGrepOpts;
+      echo -e "  --rpm - based on RPM package manager";
+      list-containers $rpmGrepOpts;
+      echo -e "  --other - other containers not fit to above groups:";
+      list-containers $otherGrepOpts;
+      return 1;
+    fi
   fi
 }
+
+function idle-exec-shell() {
+  containerName=$1;
+  defaultContainerUser=$(grep ";${containerName};" $DATABASE | cut -d ";" -f 5);
+  lxc exec $containerName -- sudo --login --user $defaultContainerUser;
+}
+
+function idle-exec-command() {
+  containerName=$1;
+  shift;
+  defaultContainerUser=$(grep ";${containerName};" $DATABASE | cut -d ";" -f 5);
+  lxc exec $containerName -- sudo --login --user $defaultContainerUser $@;
+}
+
+function idle-rm-container() {
+  containerName=$1;
+  lxc delete -f $containerName;
+}
+
+

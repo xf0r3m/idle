@@ -9,5 +9,6 @@ if [ $? -eq 0 ]; then
   zypper update -y;
   zypper install -y neofetch;
 
-  echo "/usr/bin/neofetch" >> /home/suseuser/.bashrc;
+  zypper install -y man man-pages
+  mandb -c
 fi

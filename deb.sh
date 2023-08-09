@@ -3,6 +3,8 @@
 dhclient;
 apt update;
 apt install neofetch -y;
+apt install man-db -y;
+mandb -c
 
 if ! grep -q '^ID=ubuntu' /etc/os-release; then
   useradd -m -s /bin/bash debuser;
@@ -16,7 +18,4 @@ if ! grep -q '^ID=ubuntu' /etc/os-release; then
   elif grep -q '^ID=linuxmint' /etc/os-release; then
     hostnamectl set-hostname linuxmint;
   fi
-  echo "/usr/bin/neofetch" >> /home/debuser/.bashrc;
-else
-  echo "/usr/bin/neofetch" >> /home/ubuntu/.bashrc;
 fi

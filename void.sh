@@ -7,4 +7,5 @@ echo "root ALL=(ALL:ALL) NOPASSWD:ALL" >> /etc/sudoers;
 xbps-install -Su -y;
 xbps-install -y neofetch;
 
-echo "/usr/bin/neofetch" >> /home/voiduser/.bashrc;
+xbps-install -y man-db;
+mandb -c

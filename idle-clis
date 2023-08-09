@@ -1,0 +1,104 @@
+#!/bin/bash
+
+RED="\e[31m";
+GREEN="\e[32m";
+ENDCOLOR="\e[0m";
+YES="\u2714";
+NO="\u2716";
+
+source /usr/local/bin/idle;
+
+function doInContainers() {
+  containerName=$1;
+  fn=$2;
+  shift 2;
+  if echo $containerName | grep -q '\-\-'; then
+    containerList=$(idle-get-container-name-list $containerName);
+    for containerName in $containerList; do
+      $fn $containerName $2;
+    done
+  else
+    $fn $containerName $2;
+  fi
+}
+
+function ckcmd() {
+  cmd=$2;
+  idle-exec-command $1 test -f /usr/bin/$cmd > /dev/null 2>&1;
+  usrBinTest=$?
+  idle-exec-command $1 test -f /bin/$cmd > /dev/null 2>&1;
+  binTest=$?;
+  idle-exec-command $1 test -f /usr/sbin/$cmd > /dev/null 2>&1;
+  sbinTest=$?;
+  result=$((usrBinTest * binTest * sbinTest));
+  if [ $result -eq 0 ]; then echo -e "${1}: $2 ${GREEN}${YES}${ENDCOLOR}";
+  else echo -e "${1}: $2 ${RED}${NO}${ENDCOLOR}";
+  fi
+}
+
+function ckapropos() {
+  containerName=$1;
+  shift;
+  keywords=$@;
+  echo -e "Output from: ${GREEN}$containerName${ENDCOLOR} container...";
+  idle-exec-command $containerName apropos $keywords;
+}
+
+function ckpackage() {
+  containerName=$1;
+  package=$2;
+  echo -e "Output from: ${GREEN}$containerName${ENDCOLOR}";
+  case $containerName in
+    alpine) idle-exec-command $containerName "apk search $package";;
+    archlinux) idle-exec-command $containerName "pacman -Ss $package";;
+    debian|kali|ubuntu) idle-exec-command $containerName "apt search $package";;
+    fedora|rocky) idle-exec-command $containerName "dnf search $package";;
+    gentoo) idle-exec-command $containerName "emerge -s $packages";;
+    opensuse) idle-exec-command $containerName "zypper search $packages";;
+    void) idle-exec-command $containerName "xbps-query -Rs $package";;
+  esac 
+}
+
+function help() {
+  echo "idle-cli - InterDistribution Linux Environment CLI";
+  echo "(receive command script)";
+  echo "@ 2023 morketsmerke.org";
+  echo;
+  echo "Options:";
+  echo "  list-distros - listing available containers with Linux distros on this server";
+  echo "  shell <distro_name> - bring up the shell of given distro";
+  echo "  check-commmand <distro_name> <command> - verify is given command exists in given distro";
+  echo "  apropos <distro_name> <keywords> - finds commmands match to given keywords";
+  echo "  pkgsearch <distro_name> <package> - check is given package is ready to install in given distro";
+  echo;
+  echo "<distro_name> - pointing only one distro, but you can use also:"
+  echo "  <group>:";
+  echo "    --deb - .deb packages using distros (debian,kali,ubuntu)";
+  echo "    --rpm - .rpm packages using distros (fedora,rocky,opensuse)";
+  echo "    --other - other distros don't match to above (alpine,archlinux,gentoo,void)";
+  echo "  or <--all> - all 10 available distros (warning, output could be large, use some of pager)";
+}
+
+if [ $# -gt 0 ]; then
+  source /usr/local/bin/idle;
+  command=$1;
+  shift;
+  case $command in
+    "list-distros") idle-list-containers;;
+    "shell") idle-exec-shell $1; exit;;
+    "check-command") 
+      containerName=$1;
+      doInContainers $containerName ckcmd $@;
+    exit;;
+    "apropos")
+      containerName=$1
+      doInContainers $containerName ckapropos $@;
+    exit;;
+    "pkgsearch")
+      containerName=$1;
+      doInContainers $containerName ckpackage $@;;
+  esac
+else
+  help;
+  exit 1;
+fi 
